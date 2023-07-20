@@ -1,8 +1,9 @@
 import sys
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
+    QMenu,
     QSystemTrayIcon,
     QTabWidget,
 )
@@ -26,6 +27,11 @@ class MainWindow(QMainWindow):
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(self.app_icon)
         self.tray_icon.show()
+        tray_menu = QMenu(self)
+        quit_action = QAction("Quit", self)
+        quit_action.triggered.connect(lambda: sys.exit(0))
+        tray_menu.addAction(quit_action)
+        self.tray_icon.setContextMenu(tray_menu)
 
     def make_tabs(self):
         tab_widget = QTabWidget(self)
