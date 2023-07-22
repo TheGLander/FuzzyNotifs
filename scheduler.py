@@ -1,9 +1,9 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import List, NewType
-from PySide6.QtCore import QDateTime, QTime
+from typing import Callable, List, NewType, Tuple
+from PySide6.QtCore import QDate, QDateTime, QTime, QTimer
 from random import Random
-from math import floor
+from math import floor, inf
 from camel import CamelRegistry
 import datetime
 
@@ -140,14 +140,16 @@ class Schedule:
     todos: dict[QTime, Todo]
 
     def __init__(self, config: SchedulerConfig) -> None:
+        self.todos = {}
+        self.timers = []
         rng = Random(config.seed)
         for todo in config.todos:
             for _ in range(todo.times_per_day):
                 self.allocate_todo(todo, config, rng)
 
     def is_time_avaliable(self, time: QTime, cooldown: QTimeAmount) -> bool:
-        for time, _ in self.todos.items():
-            time_from_todo = abs(time.msecsTo(time))
+        for todo_time, _ in self.todos.items():
+            time_from_todo = abs(time.msecsTo(todo_time))
             if time_from_todo < cooldown.msecsSinceStartOfDay():
                 return False
         return True
@@ -157,3 +159,42 @@ class Schedule:
         while not self.is_time_avaliable(time, config.cooldown_period):
             time = todo.get_random_time(rng, config.day_start, config.day_end)
         self.todos[time] = todo
+
+    def find_first_todo(self) -> Tuple[QTime, Todo] | None:
+        """
+        Find the first todo past the current time
+        """
+        closest_pair: Tuple[QTime, Todo] | None = None
+        closest_msecs = inf
+        cur_time = QTime.currentTime()
+        for todo_time, todo in self.todos.items():
+            time_amount = cur_time.msecsTo(todo_time)
+            if time_amount < 0 or time_amount > closest_msecs:
+                continue
+            closest_pair = (todo_time, todo)
+            closest_msecs = time_amount
+        return closest_pair
+
+    timers: List[QTimer]
+
+    def queue_todo(self, action: Callable[[Todo, QTime], None]):
+        first_todo_pair = self.find_first_todo()
+        if first_todo_pair is None:
+            return
+        (todo_time, todo) = first_todo_pair
+
+        timer = QTimer()
+
+        timer.singleShot(
+            (
+                todo_time.msecsSinceStartOfDay()
+                - QTime.currentTime().msecsSinceStartOfDay()
+            ),
+            lambda: action(todo, todo_time),
+        )
+        self.timers.append(timer)
+
+    def cancel_queued(self):
+        for timer in self.timers:
+            timer.stop()
+        self.timers.clear()

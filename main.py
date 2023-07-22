@@ -1,14 +1,16 @@
+import asyncio
 from os import makedirs
 import sys
-from PySide6.QtCore import QStandardPaths, Signal
+from PySide6.QtCore import QResource, QStandardPaths, QTime, QUrl, Signal
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QMenu,
     QSystemTrayIcon,
 )
+from PySide6.QtMultimedia import QMediaDevices, QSoundEffect
 from camel import Camel
-from scheduler import Schedule, SchedulerConfig, todo_types
+from scheduler import Schedule, SchedulerConfig, Todo, todo_types
 from pathlib import Path
 from MainWindow import MainWindow
 
@@ -23,6 +25,7 @@ class FuzzyApplication(QApplication):
     app_icon: QIcon
     tray_icon: QSystemTrayIcon
     config_changed = Signal()
+    scheduler_changed = Signal(Schedule)
     config: SchedulerConfig
     window: MainWindow
     schedule: Schedule
@@ -50,7 +53,9 @@ class FuzzyApplication(QApplication):
         self.tray_icon.setContextMenu(tray_menu)
 
     def make_main_window(self):
-        self.window = MainWindow(self.app_icon, self.config)
+        self.window = MainWindow(self.app_icon, self.config, self.schedule)
+        self.window.config_changed.connect(self.update_config)
+        self.scheduler_changed.connect(self.window.schedule_changed)
         self.window.show()
 
     def load_config(self):
@@ -76,7 +81,27 @@ class FuzzyApplication(QApplication):
 
     def update_config(self):
         self.save_config()
+        if hasattr(self, "schedule"):
+            self.schedule.cancel_queued()
         self.schedule = Schedule(self.config)
+        self.scheduler_changed.emit(self.schedule)
+
+        self.schedule.queue_todo(self.todo_sched_cycle)
+
+    def todo_sched_cycle(self, todo: Todo, time: QTime):
+        self.tray_icon.showMessage(
+            todo.title,
+            f"New fuzzy notif just dropped ({time.toString()})",
+            self.app_icon,
+        )
+        sfx = QSoundEffect(self)
+        # Why does this need to be set??
+        sfx.setAudioDevice(QMediaDevices.defaultAudioOutput())
+        sfx.setSource(QUrl.fromLocalFile("new todo.wav"))
+        sfx.setVolume(0.25)
+        sfx.play()
+
+        self.schedule.queue_todo(self.todo_sched_cycle)
 
 
 app = FuzzyApplication(sys.argv)
