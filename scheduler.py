@@ -12,9 +12,9 @@ todo_types = CamelRegistry()
 QTimeAmount = NewType("QTimeAmount", QTime)
 
 MORNING_START = 0
-MORNING_LENGTH = 0.3
-EVENING_START = 0.7
-EVENING_LENGTH = 0.3
+MORNING_LENGTH = 0.2
+EVENING_START = 0.8
+EVENING_LENGTH = 1 - EVENING_START
 
 
 class TodoBias(Enum):
