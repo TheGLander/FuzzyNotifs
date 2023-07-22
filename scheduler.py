@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import Callable, List, NewType, Tuple
+from typing import Callable, List, Literal, NewType, Tuple
 from PySide6.QtCore import QDate, QDateTime, QTime, QTimer
 from random import Random
 from math import floor, inf
@@ -106,7 +106,20 @@ class SchedulerConfig:
             return
         self.last_opened = QDateTime.currentDateTime()
         self.day_start = self.last_opened.time()
+    def get_time_of_day(self, time: QTime) -> Literal["morning", "midday", "evening"]:
+        day_length = (
+            self.day_end.msecsSinceStartOfDay() - self.day_start.msecsSinceStartOfDay()
+        )
+        morning_start = self.day_start.msecsSinceStartOfDay()
+        evening_start = morning_start + EVENING_START * day_length
+        midday_start = morning_start + (MORNING_START + MORNING_LENGTH) * day_length
+        time_ms = time.msecsSinceStartOfDay()
 
+        if time_ms > evening_start:
+            return "evening"
+        if time_ms > midday_start:
+            return "midday"
+        return "morning"
 
 @todo_types.dumper(SchedulerConfig, "scheduler_config", version=1)
 def _schedconf_dumper(config: SchedulerConfig):
@@ -138,10 +151,12 @@ def _schedconf_loader(data: dict, version: int):
 
 class Schedule:
     todos: dict[QTime, Todo]
+    config: SchedulerConfig
 
     def __init__(self, config: SchedulerConfig) -> None:
         self.todos = {}
         self.timers = []
+        self.config = config
         rng = Random(config.seed)
         for todo in config.todos:
             for _ in range(todo.times_per_day):
