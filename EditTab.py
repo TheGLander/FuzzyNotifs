@@ -1,15 +1,40 @@
 from typing import Any, List
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtWidgets import (
+    QAbstractItemDelegate,
+    QComboBox,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QSizePolicy,
     QSpinBox,
+    QStyleOptionViewItem,
+    QStyledItemDelegate,
     QTableView,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
-from scheduler import Todo
+from scheduler import Todo, TodoBias
+
+
+class BiasDelegate(QStyledItemDelegate):
+    def createEditor(
+        self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> QWidget:
+        combo_box = QComboBox(parent)
+        for bias in TodoBias:
+            combo_box.addItem(str(bias), bias)
+        return combo_box
+
+    def setEditorData(self, editor: QComboBox, index: QModelIndex) -> None:
+        model: TodoModel = index.model()  # type: ignore
+        editor.setCurrentText(str(model.todos[index.row()].bias))
+
+    def setModelData(
+        self, editor: QComboBox, model: QAbstractTableModel, index: QModelIndex
+    ) -> None:
+        model.setData(index, editor.currentData(), Qt.ItemDataRole.EditRole)
 
 
 class TodoModel(QAbstractTableModel):
@@ -22,13 +47,16 @@ class TodoModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: Qt.ItemDataRole):
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             todo = self.todos[index.row()]
-            return getattr(todo, todo.column_order[index.column()])
+            attribute = getattr(todo, todo.column_order[index.column()])
+            if type(attribute) is int:
+                return attribute
+            return str(attribute)
 
     def rowCount(self, _index):
         return len(self.todos)
 
     def columnCount(self, _index):
-        return 2
+        return len(Todo.column_names)
 
     def headerData(
         self, section: int, orientation: Qt.Orientation, role: Qt.ItemDataRole
@@ -47,10 +75,30 @@ class TodoModel(QAbstractTableModel):
         return True
 
     def flags(self, _index: QModelIndex) -> Qt.ItemFlag:
-        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsEditable
+        return (
+            Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsEditable
+            | Qt.ItemFlag.ItemIsSelectable
+        )
+
+    def new_todo(self):
+        self.beginInsertRows(QModelIndex(), len(self.todos), len(self.todos))
+        self.todos.append(Todo(title="Take a nap", times_per_day=5, bias=TodoBias.NONE))
+        self.endInsertRows()
+
+    def remove_todo(self, rows: List[int]):
+        rows.sort(reverse=True)
+        for row_n in rows:
+            self.beginRemoveRows(QModelIndex(), row_n, row_n)
+            self.todos.pop(row_n)
+            self.endRemoveRows()
+
+    @staticmethod
+    def setup_table(table: QTableView):
+        table.setItemDelegateForColumn(Todo.column_order.index("bias"), BiasDelegate())
 
 
-mock_todos = [Todo("Work more", 5), Todo("Work less", 5)]
+mock_todos = [Todo(title="Work more", bias=TodoBias.MORNING_ONLY, times_per_day=3)]
 
 
 class EditTab(QWidget):
@@ -64,6 +112,7 @@ class EditTab(QWidget):
 
         self.model = TodoModel(todos=mock_todos)
         self.table = QTableView(self)
+        self.model.setup_table(self.table)
         self.table.setModel(self.model)
         layout.addWidget(self.table)
 
@@ -72,11 +121,24 @@ class EditTab(QWidget):
         misc_options.setLayout(misc_layout)
         layout.addWidget(misc_options)
 
-        task_period_input = QSpinBox(misc_options)
+        task_period_input = QTimeEdit(misc_options)
         task_period_input.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum
         )
-        tp_label = QLabel("Minimum task interval (m)", misc_options)
+        tp_label = QLabel("Minimum task interval (h:m)", misc_options)
         tp_label.setBuddy(task_period_input)
         misc_layout.addWidget(task_period_input)
         misc_layout.addWidget(tp_label)
+
+        remove_todo = QPushButton("-", misc_options)
+        remove_todo.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        remove_todo.pressed.connect(self.remove_todo)
+        misc_layout.addWidget(remove_todo)
+
+        add_task = QPushButton("+", misc_options)
+        add_task.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        add_task.pressed.connect(self.model.new_todo)
+        misc_layout.addWidget(add_task)
+
+    def remove_todo(self):
+        self.model.remove_todo([index.row() for index in self.table.selectedIndexes()])
