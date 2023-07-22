@@ -1,5 +1,5 @@
 from typing import Any, List
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QTime, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemDelegate,
     QComboBox,
@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from scheduler import Todo, TodoBias
+from scheduler import QTimeAmount, SchedulerConfig, Todo, TodoBias
 
 
 class BiasDelegate(QStyledItemDelegate):
@@ -72,6 +72,7 @@ class TodoModel(QAbstractTableModel):
             return False
         todo = self.todos[index.row()]
         setattr(todo, todo.column_order[index.column()], value)
+        self.dataChanged.emit(index, index, [role])
         return True
 
     def flags(self, _index: QModelIndex) -> Qt.ItemFlag:
@@ -104,13 +105,19 @@ mock_todos = [Todo(title="Work more", bias=TodoBias.MORNING_ONLY, times_per_day=
 class EditTab(QWidget):
     table: QTableView
     model: TodoModel
+    config: SchedulerConfig
+    config_changed = Signal()
 
-    def __init__(self, parent):
+    def __init__(self, config: SchedulerConfig, parent):
         super().__init__(parent)
+        self.config = config
         layout = QVBoxLayout(self)
         self.setLayout(layout)
 
-        self.model = TodoModel(todos=mock_todos)
+        self.model = TodoModel(todos=config.todos)
+        self.model.dataChanged.connect(self.config_changed)
+        self.model.rowsInserted.connect(self.config_changed)
+        self.model.rowsRemoved.connect(self.config_changed)
         self.table = QTableView(self)
         self.model.setup_table(self.table)
         self.table.setModel(self.model)
@@ -125,6 +132,8 @@ class EditTab(QWidget):
         todo_cooldown_input.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum
         )
+        todo_cooldown_input.timeChanged.connect(self.update_cooldown)
+        todo_cooldown_input.setTime(config.cooldown_period)
         tc_label = QLabel("Todo cooldown (h:m)", misc_options)
         tc_label.setBuddy(todo_cooldown_input)
         misc_layout.addWidget(todo_cooldown_input)
@@ -142,3 +151,7 @@ class EditTab(QWidget):
 
     def remove_todo(self):
         self.model.remove_todo([index.row() for index in self.table.selectedIndexes()])
+
+    def update_cooldown(self, time: QTime):
+        self.config.cooldown_period = QTimeAmount(time)
+        self.config_changed.emit()

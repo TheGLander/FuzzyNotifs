@@ -1,9 +1,13 @@
 from enum import Enum
 from dataclasses import dataclass
 from typing import List, NewType
-from PySide6.QtCore import QTime
+from PySide6.QtCore import QDateTime, QTime
 from random import Random
 from math import floor
+from camel import CamelRegistry
+import datetime
+
+todo_types = CamelRegistry()
 
 QTimeAmount = NewType("QTimeAmount", QTime)
 
@@ -59,13 +63,77 @@ class Todo:
         return time_period
 
 
+@todo_types.dumper(Todo, "todo", version=1)
+def _todo_dump(todo: Todo):
+    return dict(
+        title=todo.title,
+        times_per_day=todo.times_per_day,
+        bias=todo.bias.value,
+    )
+
+
+@todo_types.loader("todo", version=1)
+def _todo_loader(data: dict, version: int):
+    return Todo(
+        title=data["title"],
+        times_per_day=data["times_per_day"],
+        bias=TodoBias(data["bias"]),
+    )
+
+
 @dataclass
 class SchedulerConfig:
     day_start: QTime
     day_end: QTime
+    last_opened: QDateTime
     cooldown_period: QTimeAmount
     seed: int
     todos: List[Todo]
+
+    @staticmethod
+    def make_default_config():
+        return SchedulerConfig(
+            day_start=QTime.currentTime(),
+            day_end=QTime(22, 0),
+            last_opened=QDateTime.currentDateTime(),
+            cooldown_period=QTimeAmount(QTime(0, 5)),
+            seed=0,
+            todos=[],
+        )
+
+    def update_morning(self):
+        if self.last_opened.date().toPython() >= datetime.date.today():  # type: ignore
+            return
+        self.last_opened = QDateTime.currentDateTime()
+        self.day_start = self.last_opened.time()
+
+
+@todo_types.dumper(SchedulerConfig, "scheduler_config", version=1)
+def _schedconf_dumper(config: SchedulerConfig):
+    return dict(
+        day_start=config.day_start.msecsSinceStartOfDay(),
+        day_end=config.day_end.msecsSinceStartOfDay(),
+        last_opened=config.last_opened.toPython(),
+        cooldown_period=config.cooldown_period.msecsSinceStartOfDay(),
+        seed=config.seed,
+        todos=config.todos,
+    )
+
+
+@todo_types.loader("scheduler_config", version=1)
+def _schedconf_loader(data: dict, version: int):
+    return SchedulerConfig(
+        day_start=QTime.fromMSecsSinceStartOfDay(data["day_start"]),
+        day_end=QTime.fromMSecsSinceStartOfDay(data["day_end"]),
+        last_opened=QDateTime.fromMSecsSinceEpoch(
+            floor(data["last_opened"].timestamp() * 1000)
+        ),
+        cooldown_period=QTimeAmount(
+            QTime.fromMSecsSinceStartOfDay(data["cooldown_period"])
+        ),
+        seed=data["seed"],
+        todos=data["todos"],
+    )
 
 
 class Schedule:
