@@ -2,7 +2,7 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Callable, List, Literal, NewType, Tuple
 from PySide6.QtCore import QDate, QDateTime, QTime, QTimer
-from random import Random
+from random import Random, SystemRandom
 from math import floor, inf
 from camel import CamelRegistry
 import datetime
@@ -81,6 +81,9 @@ def _todo_loader(data: dict, version: int):
     )
 
 
+MINIMUM_MORNING_TIME = datetime.time(5, 0, 0)
+
+
 @dataclass
 class SchedulerConfig:
     day_start: QTime
@@ -102,10 +105,13 @@ class SchedulerConfig:
         )
 
     def update_morning(self):
-        if self.last_opened.date().toPython() >= datetime.date.today():  # type: ignore
-            return
-        self.last_opened = QDateTime.currentDateTime()
-        self.day_start = self.last_opened.time()
+        now = datetime.datetime.now()
+        last_open: datetime.datetime = self.last_opened.toPython()  # type: ignore
+        if now.date() > last_open.date() and now.time() > MINIMUM_MORNING_TIME:
+            self.last_opened = QDateTime.currentDateTime()
+            self.day_start = self.last_opened.time()
+            self.seed = SystemRandom().randint(0, 2**32)
+
     def get_time_of_day(self, time: QTime) -> Literal["morning", "midday", "evening"]:
         day_length = (
             self.day_end.msecsSinceStartOfDay() - self.day_start.msecsSinceStartOfDay()
@@ -120,6 +126,7 @@ class SchedulerConfig:
         if time_ms > midday_start:
             return "midday"
         return "morning"
+
 
 @todo_types.dumper(SchedulerConfig, "scheduler_config", version=1)
 def _schedconf_dumper(config: SchedulerConfig):
