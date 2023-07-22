@@ -65,22 +65,22 @@ class SchedulerConfig:
     day_end: QTime
     cooldown_period: QTimeAmount
     seed: int
-    tasks: List[Todo]
+    todos: List[Todo]
 
 
 class Schedule:
-    tasks: dict[QTime, Todo]
+    todos: dict[QTime, Todo]
 
     def __init__(self, config: SchedulerConfig) -> None:
         rng = Random(config.seed)
-        for todo in config.tasks:
+        for todo in config.todos:
             for _ in range(todo.times_per_day):
                 self.allocate_todo(todo, config, rng)
 
     def is_time_avaliable(self, time: QTime, cooldown: QTimeAmount) -> bool:
-        for time, _ in self.tasks.items():
-            time_from_task = abs(time.msecsTo(time))
-            if time_from_task < cooldown.msecsSinceStartOfDay():
+        for time, _ in self.todos.items():
+            time_from_todo = abs(time.msecsTo(time))
+            if time_from_todo < cooldown.msecsSinceStartOfDay():
                 return False
         return True
 
@@ -88,4 +88,4 @@ class Schedule:
         time = todo.get_random_time(rng, config.day_start, config.day_end)
         while not self.is_time_avaliable(time, config.cooldown_period):
             time = todo.get_random_time(rng, config.day_start, config.day_end)
-        self.tasks[time] = todo
+        self.todos[time] = todo

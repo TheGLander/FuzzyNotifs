@@ -121,24 +121,24 @@ class EditTab(QWidget):
         misc_options.setLayout(misc_layout)
         layout.addWidget(misc_options)
 
-        task_period_input = QTimeEdit(misc_options)
-        task_period_input.setSizePolicy(
+        todo_cooldown_input = QTimeEdit(misc_options)
+        todo_cooldown_input.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum
         )
-        tp_label = QLabel("Minimum task interval (h:m)", misc_options)
-        tp_label.setBuddy(task_period_input)
-        misc_layout.addWidget(task_period_input)
-        misc_layout.addWidget(tp_label)
+        tc_label = QLabel("Todo cooldown (h:m)", misc_options)
+        tc_label.setBuddy(todo_cooldown_input)
+        misc_layout.addWidget(todo_cooldown_input)
+        misc_layout.addWidget(tc_label)
 
         remove_todo = QPushButton("-", misc_options)
         remove_todo.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
         remove_todo.pressed.connect(self.remove_todo)
         misc_layout.addWidget(remove_todo)
 
-        add_task = QPushButton("+", misc_options)
-        add_task.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
-        add_task.pressed.connect(self.model.new_todo)
-        misc_layout.addWidget(add_task)
+        add_todo = QPushButton("+", misc_options)
+        add_todo.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        add_todo.pressed.connect(self.model.new_todo)
+        misc_layout.addWidget(add_todo)
 
     def remove_todo(self):
         self.model.remove_todo([index.row() for index in self.table.selectedIndexes()])
