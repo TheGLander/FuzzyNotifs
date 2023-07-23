@@ -70,7 +70,8 @@ class FuzzyApplication(QApplication):
             "scheduler_config.yaml",
         )
         if file_path == "":
-            return SchedulerConfig.make_default_config()
+            self.config = SchedulerConfig.make_default_config()
+            return
         with open(file_path, "r") as file:
             self.config = Camel([todo_types]).load(file.read())
 
