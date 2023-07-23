@@ -28,11 +28,12 @@ class FuzzyApplication(QApplication):
     config_changed = Signal()
     scheduler_changed = Signal(Schedule)
     config: SchedulerConfig
-    window: MainWindow
+    window: MainWindow | None
     schedule: Schedule
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.window = None
         self.app_icon = QIcon("icon.png")
         self.setQuitOnLastWindowClosed(False)
         self.make_tray_icon()
@@ -41,7 +42,7 @@ class FuzzyApplication(QApplication):
         self.config.update_morning()
         self.update_config()
         if "--silent" not in self.arguments():
-            self.make_main_window()
+            self.open_main_window()
 
     def make_tray_icon(self):
         self.tray_icon = QSystemTrayIcon(self)
@@ -50,13 +51,17 @@ class FuzzyApplication(QApplication):
         tray_menu = QMenu()
         quit_action = QAction("Quit", tray_menu)
         quit_action.triggered.connect(lambda: sys.exit(0))
+        open_action = QAction("Open", tray_menu)
+        open_action.triggered.connect(self.open_main_window)
+        tray_menu.addAction(open_action)
         tray_menu.addAction(quit_action)
         self.tray_icon.setContextMenu(tray_menu)
 
-    def make_main_window(self):
-        self.window = MainWindow(self.app_icon, self.config, self.schedule)
-        self.window.config_changed.connect(self.update_config)
-        self.scheduler_changed.connect(self.window.schedule_changed)
+    def open_main_window(self):
+        if self.window is None:
+            self.window = MainWindow(self.app_icon, self.config, self.schedule)
+            self.window.config_changed.connect(self.update_config)
+            self.scheduler_changed.connect(self.window.schedule_changed)
         self.window.show()
 
     def load_config(self):
