@@ -19,9 +19,6 @@ if __name__ != "__main__":
     sys.exit(1)
 
 
-QApplication.setApplicationName("FuzzyNotifs")
-
-
 class FuzzyApplication(QApplication):
     app_icon: QIcon
     tray_icon: QSystemTrayIcon
@@ -35,6 +32,9 @@ class FuzzyApplication(QApplication):
         super().__init__(*args, **kwargs)
         self.window = None
         self.app_icon = QIcon("icon.png")
+        app.setWindowIcon(self.app_icon)
+        app.setApplicationDisplayName("Fuzzy notifications")
+        app.setApplicationName("FuzzyNotifs")
         self.setQuitOnLastWindowClosed(False)
         self.make_tray_icon()
 
