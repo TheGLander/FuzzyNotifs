@@ -32,9 +32,9 @@ class FuzzyApplication(QApplication):
         super().__init__(*args, **kwargs)
         self.window = None
         self.app_icon = QIcon("icon.png")
-        app.setWindowIcon(self.app_icon)
-        app.setApplicationDisplayName("Fuzzy notifications")
-        app.setApplicationName("FuzzyNotifs")
+        self.setWindowIcon(self.app_icon)
+        self.setApplicationDisplayName("Fuzzy notifications")
+        self.setApplicationName("FuzzyNotifs")
         self.setQuitOnLastWindowClosed(False)
         self.make_tray_icon()
 
